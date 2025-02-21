@@ -1,0 +1,10 @@
+matplotlib
+numpy
+ipykernel
+pytorch
+opencv
+ultralytics
+labelImg
+opencv
+tqdm
+pillow
