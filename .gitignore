@@ -1,3 +1,5 @@
 command.md
 train
 .DS_STORE
+all/output/images/*.jpg
+all/output/labels/*.txt

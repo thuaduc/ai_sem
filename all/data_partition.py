@@ -49,8 +49,9 @@ def adjust_yolo_labels(labels, crop_x, crop_y, crop_size):
     return new_labels
 
 
-# Process images
-image_files = [f for f in os.listdir(input_image_dir) if f.endswith(".jpg")]
+# Process images in alphabetical order
+image_files = sorted([f for f in os.listdir(input_image_dir) if f.endswith(".jpg")])
+
 counter = 0  # Counter for naming new images
 
 for image_file in image_files:
@@ -87,6 +88,7 @@ for image_file in image_files:
                     f.write("\n".join(new_labels))
 
             counter += 1
+
 
 # Copy classes.txt to output directory
 classes_file = os.path.join(input_label_dir, "classes.txt")
