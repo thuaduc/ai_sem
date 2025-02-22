@@ -38,8 +38,30 @@ def adjust_yolo_labels(labels, crop_x, crop_y, crop_size):
             # Adjust the bounding box relative to the crop
             new_x_center = (abs_x_center - crop_x) / crop_size
             new_y_center = (abs_y_center - crop_y) / crop_size
+
             new_width = abs_width / crop_size
             new_height = abs_height / crop_size
+
+            # box overfloat to the left
+            if new_x_center < new_width:
+                # print(f"old x center {new_x_center} old width {new_width}")
+                new_x_center = (new_x_center + (new_width / 2)) / 2
+                new_width = new_x_center * 2
+                # print(f"new x center {new_x_center} new width {new_width}\n")
+
+            if new_y_center < new_height:
+                new_y_center = (new_y_center + (new_height / 2)) / 2
+                new_height = new_y_center * 2
+
+            if (new_x_center + (new_width / 2)) > 1:
+                print(f"old x center {new_x_center} old width {new_width}")
+                new_x_center -= (new_x_center + (new_width / 2) - 1) / 2
+                new_width = (1 - new_x_center) * 2
+                print(f"new x center {new_x_center} new width {new_width}\n")
+
+            if new_y_center + new_height / 2 > 1:
+                new_y_center -= (new_y_center + (new_height / 2) - 1) / 2
+                new_height = (1 - new_y_center) * 2
 
             # Add to new labels
             new_labels.append(
@@ -52,12 +74,11 @@ def adjust_yolo_labels(labels, crop_x, crop_y, crop_size):
 # Process images in alphabetical order
 image_files = sorted([f for f in os.listdir(input_image_dir) if f.endswith(".jpg")])
 
-counter = 0  # Counter for naming new images
+counter = 1  # Counter for naming new images
 
 for image_file in image_files:
     img_path = os.path.join(input_image_dir, image_file)
     img = cv2.imread(img_path)
-    print(img_path)
 
     if img is None:
         print(f"Error loading image: {image_file}")

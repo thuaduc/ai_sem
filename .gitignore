@@ -3,3 +3,4 @@ train
 .DS_STORE
 all/output/images/*.jpg
 all/output/labels/*.txt
+all/images/temp

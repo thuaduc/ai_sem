@@ -31,7 +31,7 @@ class_colors = {
     3: (255, 255, 0),  # Yellow
 }
 
-current_index = 0
+current_index = 1
 
 # Initialize Tkinter
 root = tk.Tk()
@@ -42,6 +42,12 @@ draw_boxes = BooleanVar(value=True)
 canvas_width, canvas_height = 600, 600
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.pack()
+
+# Image number label
+image_number_label = tk.Label(
+    root, text=f"Image: {current_index + 1}/{len(image_files)}"
+)
+image_number_label.pack()
 
 
 def show_image():
@@ -100,6 +106,9 @@ def show_image():
     img_tk = ImageTk.PhotoImage(image)
     canvas.create_image(x_offset, y_offset, anchor=tk.NW, image=img_tk)
     canvas.img_tk = img_tk
+
+    # Update the image number label
+    image_number_label.config(text=f"Image: {current_index}/{len(image_files)}")
 
 
 def next_image():
