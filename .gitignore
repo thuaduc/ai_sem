@@ -6,4 +6,8 @@ all/output/labels/*.txt
 all/images/temp
 test.py
 output.zip
-output
+full images with boxes
+yolo
+runs
+data
+.vscode
