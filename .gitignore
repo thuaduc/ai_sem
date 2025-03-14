@@ -3,6 +3,7 @@ train
 .DS_STORE
 all/output/images/*.jpg
 all/output/labels/*.txt
+all/output/data
 all/images/temp
 test.py
 output.zip

@@ -14,7 +14,7 @@ os.makedirs(output_label_dir, exist_ok=True)
 
 # Image parameters
 orig_width, orig_height = 2080, 1544  # Original size of images
-crop_size = 512  # Sliding window size
+crop_size = 640  # Sliding window size
 step_size = 256  # Overlapping step
 
 

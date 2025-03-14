@@ -1,13 +1,11 @@
 pytorch
+ultralytics
 torchvision
 
 matplotlib
 numpy
 ipykernel
-opencv
-ultralytics
 labelImg
-opencv
 tqdm
 pillow
 d2l
