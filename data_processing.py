@@ -3,6 +3,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms.functional import pil_to_tensor
 from PIL import Image
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 # S = grids
@@ -45,6 +47,7 @@ class YOLODataset(Dataset):
                             height,
                         ]
                     )
+        else:
             boxes.append([-1, 0, 0, 0, 0])
 
         labels_matrix = torch.zeros((self.S, self.S, self.C + 5 * self.B))
@@ -58,23 +61,62 @@ class YOLODataset(Dataset):
                 if labels_matrix[i, j, 4] == 0:
                     labels_matrix[i, j, 4] = 1
                     box_coordinates = torch.tensor(
-                        x_cell, y_cell, width_cell, height_celll
+                        [x_cell, y_cell, width_cell, height_celll]
                     )
                     labels_matrix[i, j, 5:9] = box_coordinates
                     labels_matrix[class_id] = 1
+                    print(i, j)
 
         return image, labels_matrix
 
 
-if __name__ == "__main__":
+def plot_image_with_boxes(image, boxes):
+    fig, ax = plt.subplots(1)
+    ax.imshow(image)
+    img_width, img_height = image.size
 
+    for box in boxes:
+
+        for i in range(7):
+            for j in range(7):
+                if box[i, j, 4] == 1:
+                    x_center, y_center, width, height = box[0, 2, 5:]
+                    x_min = x_center - width / 2
+                    y_min = (1024 / 7) + y_center - (height / 2)
+
+                    rect = patches.Rectangle(
+                        (x_min, y_min),
+                        width=width,
+                        height=height,
+                        linewidth=2,
+                        edgecolor="red",
+                        facecolor="none",
+                    )
+                    ax.add_patch(rect)
+                    ax.text(
+                        x_min,
+                        y_min - 5,
+                        f"Class: ",
+                        color="red",
+                        fontsize=12,
+                        weight="bold",
+                    )
+
+    plt.show()
+
+
+if __name__ == "__main__":
     # Create Datasets with transformations
-    train_dataset = YOLODataset("data/train/images", "data/train/bales")
+    train_dataset = YOLODataset("data/example/images", "data/example/labels")
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
 
     # Example Usage
-    for images, labels in train_loader:
-        print(images.shape, labels.shape)
+    for images, labels_matrix in train_loader:
+        print(images.shape, labels_matrix.shape)
+
+        image = Image.open("data/example/images/347.jpg").convert("RGB")
+        plot_image_with_boxes(image, labels_matrix)
+
         break

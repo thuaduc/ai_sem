@@ -9,5 +9,5 @@ output.zip
 full images with boxes
 yolo
 runs
-data
 .vscode
+!data/train
