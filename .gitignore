@@ -8,6 +8,6 @@ test.py
 output.zip
 full images with boxes
 yolo
-runs
 .vscode
 !data/train
+colab/runs

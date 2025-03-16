@@ -4,6 +4,6 @@ val: val/images  # Path to validation images relative to 'path'
 test: test/images  # Path to test images relative to 'path'
 
 # Number of classes
-nc: 4
+nc: 3
 
-names: ["1", "2", "3", "4"]
+names: ["1", "2", "3"]

@@ -3,10 +3,10 @@ import cv2
 import numpy as np
 
 # Define paths
-input_image_dir = "images"
-input_label_dir = "labels"
-output_image_dir = "output/images"
-output_label_dir = "output/labels"
+input_image_dir = "test"
+input_label_dir = "test"
+output_image_dir = "output/test/images"
+output_label_dir = "output/test/labels"
 
 # Ensure output directories exist
 os.makedirs(output_image_dir, exist_ok=True)
