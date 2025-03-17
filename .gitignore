@@ -11,3 +11,5 @@ yolo
 .vscode
 !data/train
 colab/runs
+*.docx
+*.pdf

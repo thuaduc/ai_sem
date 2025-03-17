@@ -9,4 +9,4 @@ labelImg
 tqdm
 pillow
 d2l
-ray
+streamlit
