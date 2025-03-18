@@ -11,37 +11,26 @@ device = (
     else "cuda" if torch.cuda.is_available() else "cpu"
 )
 
-"""
-
-if device == "cuda":
-    print("CUDA is available. Running on GPU.")
-
-    # Load a model
-    model = YOLO("yolo11n.pt")  # load a pretrained model (recommended for training)
-    model.to(device)
-
-    # Train the model
-    results = model.train(
-        data="config.yaml", epochs=100, imgsz=640, device=device, batch=16, patience=10
-    )
-else:
-    print("CUDA is not available. Exiting.")
-
-"""
-
 # Load a model
-model = YOLO("yolo11n.pt")  # load a pretrained model
+model = YOLO("yolo11x.pt")  # load a pretrained model
 model.to(device)
 
 # Train the model
 results = model.train(
     data="config.yaml",
-    epochs=10,
+    epochs=200,
     imgsz=640,
     device=device,
     batch=16,
-    patience=10,
-    dropout=0.3,
-    lr0=0.001,
-    lrf=0.1,
+    optimizer="Adam",
+    patience=20,
+    dropout=0.5,
+    lr0=0.00389,
+    lrf=0.01148,
+    momentum=0.60707,
+    weight_decay=0.00054,
+    warmup_epochs=3.27627,
+    warmup_momentum=0.58502,
+    box=0.19096,
+    cls=0.46863,
 )
