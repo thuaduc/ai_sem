@@ -10,7 +10,7 @@ random.seed(time.time())
 source_images = "output/images"
 source_labels = "output/labels"
 dest_root = "datasets"
-subsets = {"train": 0.8, "val": 0.2}
+subsets = {"train": 0.85, "val": 0.15}
 
 # Ensure destination directories exist
 for subset in subsets:

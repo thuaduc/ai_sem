@@ -13,3 +13,7 @@ yolo
 colab/runs
 *.docx
 *.pdf
+*.zip
+*.cache
+yolo11x.pt
+yolo11n.pt
