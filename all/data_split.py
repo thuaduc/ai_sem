@@ -1,49 +1,59 @@
 import os
 import shutil
 import random
-import time
-
-# Seed randomness for different splits each run
-random.seed(time.time())
-
-# Define paths
-source_images = "output/images"
-source_labels = "output/labels"
-dest_root = "datasets"
-subsets = {"train": 0.85, "val": 0.15}
-
-# Ensure destination directories exist
-for subset in subsets:
-    os.makedirs(os.path.join(dest_root, subset, "images"), exist_ok=True)
-    os.makedirs(os.path.join(dest_root, subset, "labels"), exist_ok=True)
-
-# Get all image filenames and shuffle
-image_files = [f for f in os.listdir(source_images) if f.endswith(".jpg")]
-random.shuffle(image_files)
-
-# Split dataset randomly
-split_index = int(len(image_files) * subsets["train"])
-train_files = image_files[:split_index]
-val_files = image_files[split_index:]
+from collections import defaultdict
 
 
-# Function to copy files
-def copy_files(file_list, subset):
-    for img_file in file_list:
-        label_file = os.path.splitext(img_file)[0] + ".txt"
-        shutil.copy(
-            os.path.join(source_images, img_file),
-            os.path.join(dest_root, subset, "images", img_file),
-        )
-        label_path = os.path.join(source_labels, label_file)
-        if os.path.exists(label_path):
-            shutil.copy(
-                label_path, os.path.join(dest_root, subset, "labels", label_file)
-            )
+def load_labels(label_path):
+    """Loads labels and groups images by class ID."""
+    class_to_images = defaultdict(list)
+
+    for label_file in os.listdir(label_path):
+        if not label_file.endswith(".txt"):
+            continue
+
+        image_name = label_file.replace(".txt", ".jpg")
+        image_path = os.path.join("output/images", image_name)
+        label_file_path = os.path.join(label_path, label_file)
+
+        if os.path.exists(image_path):
+            with open(label_file_path, "r") as f:
+                lines = f.readlines()
+                if lines:
+                    class_id = int(lines[0].split()[0])
+                    class_to_images[class_id].append((image_path, label_file_path))
+
+    return class_to_images
 
 
-# Copy files to respective folders
-copy_files(train_files, "train")
-copy_files(val_files, "val")
+def split_and_move(class_to_images, train_ratio=0.9):
+    """Splits the data and moves it into the appropriate directories."""
+    base_dir = "datasets"
+    train_img_dir = os.path.join(base_dir, "train/images")
+    train_lbl_dir = os.path.join(base_dir, "train/labels")
+    val_img_dir = os.path.join(base_dir, "val/images")
+    val_lbl_dir = os.path.join(base_dir, "val/labels")
 
-print("Dataset successfully split!")
+    # Create directories if they don't exist
+    for folder in [train_img_dir, train_lbl_dir, val_img_dir, val_lbl_dir]:
+        os.makedirs(folder, exist_ok=True)
+
+    for class_id, images in class_to_images.items():
+        random.shuffle(images)
+        split_idx = int(len(images) * train_ratio)
+        train_set = images[:split_idx]
+        val_set = images[split_idx:]
+
+        for img_path, lbl_path in train_set:
+            shutil.copy(img_path, train_img_dir)
+            shutil.copy(lbl_path, train_lbl_dir)
+
+        for img_path, lbl_path in val_set:
+            shutil.copy(img_path, val_img_dir)
+            shutil.copy(lbl_path, val_lbl_dir)
+
+
+if __name__ == "__main__":
+    label_folder = "output/labels"
+    class_images = load_labels(label_folder)
+    split_and_move(class_images)
