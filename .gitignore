@@ -17,3 +17,4 @@ colab/runs
 *.cache
 yolo11x.pt
 yolo11n.pt
+mean_average_precision

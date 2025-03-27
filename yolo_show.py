@@ -5,10 +5,10 @@ from ultralytics import YOLO
 from PIL import Image
 
 # Load model
-model = YOLO("colab/runs_18_03_2025/detect/train3/weights/best.pt")
+model = YOLO("colab/runs_27_03_2025_structured/detect/train/weights/best.pt")
 
 # Define image folder
-image_folder = "all/test/images"
+image_folder = "datasets/test/images"
 image_paths = glob.glob(os.path.join(image_folder, "*.jpg"))
 
 # Streamlit app

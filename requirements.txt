@@ -10,3 +10,4 @@ tqdm
 pillow
 d2l
 streamlit
+supervision
