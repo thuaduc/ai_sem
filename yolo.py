@@ -18,12 +18,12 @@ model.to(device)
 # Train the model
 results = model.train(
     data="config.yaml",
-    epochs=100,
+    epochs=150,
     imgsz=640,
     device=device,
-    batch=16,
+    batch=64,
     optimizer="AdamW",
-    patience=20,
+    patience=15,
     dropout=0.5,
     lr0=0.00389,
     lrf=0.01148,
