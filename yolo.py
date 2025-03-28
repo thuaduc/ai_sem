@@ -12,7 +12,7 @@ device = (
 )
 
 # Load a model
-model = YOLO("yolo11s.pt")  # load a pretrained model
+model = YOLO("yolo11n.pt")  # load a pretrained model
 model.to(device)
 
 # Train the model
