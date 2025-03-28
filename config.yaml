@@ -6,4 +6,4 @@ test: test/images  # Path to test images relative to 'path'
 # Number of classes
 nc: 1
 
-names: ["particle"]
+names: ["0"]
