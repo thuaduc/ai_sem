@@ -241,7 +241,8 @@ def visualize_predictions(model_path, image_path, label_path, confidence_thresho
 
 def main():
     # Configuration
-    MODEL_PATH = "colab/runs_27_03_2025_structured/detect/train/weights/best.pt"
+
+    MODEL_PATH = "colab/runs_28_03_2025_structured/detect/train2/weights/best.pt"
     IMAGES_DIR = "datasets/test/images"
     LABELS_DIR = "datasets/test/labels"
 
