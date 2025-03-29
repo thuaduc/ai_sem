@@ -242,13 +242,13 @@ def visualize_predictions(model_path, image_path, label_path, confidence_thresho
 def main():
     # Configuration
 
-    MODEL_PATH = "colab/runs_28_03_2025_structured/detect/train2/weights/best.pt"
+    MODEL_PATH = "colab/runs_29_03_2025_structured/detect/train3/weights/best.pt"
     IMAGES_DIR = "datasets/test/images"
     LABELS_DIR = "datasets/test/labels"
 
     # Confidence threshold
     CONFIDENCE_THRESHOLD = 0.1
-    IOU_THRESHOLD = 0.5
+    IOU_THRESHOLD = 0.3
 
     # Find first image and its corresponding label
     try:
