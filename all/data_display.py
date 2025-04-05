@@ -32,6 +32,7 @@ class_colors = {
 }
 
 current_index = 1
+current_image = None  # Store the current image
 
 # Initialize Tkinter
 root = tk.Tk()
@@ -51,8 +52,7 @@ image_number_label.pack()
 
 
 def show_image():
-    global current_index
-
+    global current_index, current_image
     if current_index < 0:
         current_index = 0
     if current_index >= len(image_files):
@@ -72,28 +72,19 @@ def show_image():
                 parts = line.strip().split()
                 if len(parts) < 5:
                     continue
-
                 class_id, x_center, y_center, w, h = map(float, parts)
                 class_id = int(class_id)
                 if class_id not in class_colors:
                     continue
-
                 color = class_colors[class_id]
                 x1 = int((x_center - w / 2) * width)
                 y1 = int((y_center - h / 2) * height)
                 x2 = int((x_center + w / 2) * width)
                 y2 = int((y_center + h / 2) * height)
-
                 cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(
-                    image,
-                    str(class_id),
-                    (x1 + 5, y1 + 15),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    color,
-                    2,
-                )
+
+    # Store the current image for saving
+    current_image = image.copy()
 
     # Convert OpenCV image to PIL format
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -102,7 +93,6 @@ def show_image():
     # Center the image on the canvas
     x_offset = (canvas_width - width) // 2
     y_offset = (canvas_height - height) // 2
-
     img_tk = ImageTk.PhotoImage(image)
     canvas.create_image(x_offset, y_offset, anchor=tk.NW, image=img_tk)
     canvas.img_tk = img_tk
@@ -127,6 +117,29 @@ def toggle_boxes():
     show_image()
 
 
+def save_image():
+    if current_image is None:
+        return
+
+    # Open file dialog to choose save location and filename
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".jpg",
+        filetypes=[
+            ("JPEG files", "*.jpg"),
+            ("PNG files", "*.png"),
+            ("All files", "*.*"),
+        ],
+        initialfile=f"image_{current_index}",
+    )
+
+    if file_path:
+        # Save the image
+        cv2.imwrite(file_path, current_image)
+        save_status.config(text=f"Image saved to: {os.path.basename(file_path)}")
+        # Reset status message after 3 seconds
+        root.after(3000, lambda: save_status.config(text=""))
+
+
 # Button frame for centering buttons
 button_frame = tk.Frame(root)
 button_frame.pack()
@@ -141,6 +154,14 @@ chk_boxes = Checkbutton(
     button_frame, text="Show Bounding Boxes", variable=draw_boxes, command=toggle_boxes
 )
 chk_boxes.pack(side=tk.LEFT, padx=10, pady=10)
+
+# Add Save button
+btn_save = tk.Button(button_frame, text="Save Image", command=save_image)
+btn_save.pack(side=tk.LEFT, padx=10, pady=10)
+
+# Status message for save confirmation
+save_status = tk.Label(root, text="", fg="green")
+save_status.pack()
 
 show_image()
 root.mainloop()

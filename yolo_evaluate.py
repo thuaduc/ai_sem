@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
-from matplotlib.widgets import Button
+import glob
 
 
 def load_yolo_labels(label_path: str):
@@ -17,7 +17,6 @@ def load_yolo_labels(label_path: str):
         list: List of annotations [class_id, x_center, y_center, width, height]
     """
     if not os.path.exists(label_path):
-        print(f"Warning: Label file not found at {label_path}")
         return []
 
     with open(label_path, "r") as f:
@@ -94,13 +93,6 @@ def evaluate_precision(ground_truth, predictions, iou_threshold=0.5):
     Returns:
         dict: Precision metrics
     """
-    # Flatten ground truth and predictions
-    all_ground_truth = [box for img_gt in ground_truth for box in img_gt]
-    all_predictions = [box for img_pred in predictions for box in img_pred]
-
-    # Sort predictions by confidence (if available)
-    all_predictions.sort(key=lambda x: x[5] if len(x) > 5 else 1.0, reverse=True)
-
     # Track true positives and false positives
     true_positives = 0
     false_positives = 0
@@ -108,14 +100,14 @@ def evaluate_precision(ground_truth, predictions, iou_threshold=0.5):
 
     # Match predictions to ground truth
     matched_gt = set()
-    for pred in all_predictions:
+    for pred in predictions:
         # For precision calculation, we only care about the box coordinates
         pred_box = pred[1:5]
 
         # Find best matching ground truth
         best_match = None
         best_iou = 0
-        for i, gt in enumerate(all_ground_truth):
+        for i, gt in enumerate(ground_truth):
             # If class matches (first element is class)
             if gt[0] == pred[0]:
                 iou = compute_iou(pred_box, gt[1:5])
@@ -131,7 +123,7 @@ def evaluate_precision(ground_truth, predictions, iou_threshold=0.5):
             false_positives += 1
 
     # Count false negatives (ground truth not matched)
-    false_negatives = len(all_ground_truth) - len(matched_gt)
+    false_negatives = len(ground_truth) - len(matched_gt)
 
     # Compute metrics
     precision = (
@@ -157,6 +149,8 @@ def evaluate_precision(ground_truth, predictions, iou_threshold=0.5):
         "true_positives": true_positives,
         "false_positives": false_positives,
         "false_negatives": false_negatives,
+        "gt_count": len(ground_truth),
+        "pred_count": len(predictions),
     }
 
 
@@ -192,8 +186,9 @@ def process_single_image(model, image_path, label_path, confidence_threshold=0.5
     gt_image = image.copy()
     for bbox in ground_truth_boxes:
         # Unpack bbox (class_id, x_min, y_min, x_max, y_max)
-        _, x_min, y_min, x_max, y_max = bbox
+        class_id, x_min, y_min, x_max, y_max = bbox
         cv2.rectangle(gt_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+        # Remove class label text
 
     # Prepare prediction visualization and data
     pred_image = image.copy()
@@ -209,264 +204,239 @@ def process_single_image(model, image_path, label_path, confidence_threshold=0.5
         predictions.append((class_id, x_min, y_min, x_max, y_max, conf))
 
         cv2.rectangle(pred_image, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)
+        # Remove class and confidence text
 
     return image, ground_truth_boxes, predictions, gt_image, pred_image
 
 
-def calculate_average_metrics(
-    model, images_dir, labels_dir, confidence_threshold=0.5, iou_threshold=0.5
+def get_label_object_count(label_path):
+    """
+    Count the number of objects (lines) in a label file
+
+    Args:
+        label_path (str): Path to the YOLO format label file
+
+    Returns:
+        int: Number of objects in the label file
+    """
+    if not os.path.exists(label_path):
+        return 0
+
+    with open(label_path, "r") as f:
+        return len(f.readlines())
+
+
+def process_and_save_visualization(
+    model,
+    image_path,
+    label_path,
+    confidence_threshold=0.5,
+    iou_threshold=0.5,
+    output_img_path=None,
+    output_txt_path=None,
 ):
     """
-    Calculate average metrics across all test images
+    Process a single image, save visualization and metrics to files
 
     Args:
         model: Loaded YOLO model
-        images_dir (str): Directory containing test images
-        labels_dir (str): Directory containing test labels
+        image_path (str): Path to the input image
+        label_path (str): Path to the ground truth label file
         confidence_threshold (float): Confidence threshold for predictions
         iou_threshold (float): IoU threshold for evaluation
-
-    Returns:
-        tuple: (avg_metrics, all_metrics) - Average metrics and per-image metrics
+        output_img_path (str): Path to save visualization
+        output_txt_path (str): Path to save metrics
     """
-    image_files = [
-        f for f in os.listdir(images_dir) if f.endswith((".jpg", ".png", ".jpeg"))
-    ]
+    # Get object count from label file
+    object_count = get_label_object_count(label_path)
 
-    if not image_files:
-        print("No images found in the specified directory.")
-        return None, []
-
-    all_ground_truth = []
-    all_predictions = []
-    per_image_metrics = []
-
-    # Process each image
-    for img_file in image_files:
-        image_path = os.path.join(images_dir, img_file)
-        label_path = os.path.join(labels_dir, os.path.splitext(img_file)[0] + ".txt")
-
-        if not os.path.exists(label_path):
-            print(f"Warning: No label file found for {img_file}, skipping.")
-            continue
-
-        _, ground_truth, predictions, _, _ = process_single_image(
-            model, image_path, label_path, confidence_threshold
-        )
-
-        # Calculate metrics for this image
-        img_metrics = evaluate_precision([ground_truth], [predictions], iou_threshold)
-        per_image_metrics.append((img_file, img_metrics))
-
-        # Store for overall metrics calculation
-        all_ground_truth.append(ground_truth)
-        all_predictions.append(predictions)
-
-    # Calculate overall metrics
-    overall_metrics = evaluate_precision(
-        all_ground_truth, all_predictions, iou_threshold
+    # Process the image with labels
+    _, ground_truth, predictions, gt_image, pred_image = process_single_image(
+        model, image_path, label_path, confidence_threshold
     )
 
-    # Calculate average metrics
-    avg_metrics = {
-        "precision": np.mean([m[1]["precision"] for m in per_image_metrics]),
-        "recall": np.mean([m[1]["recall"] for m in per_image_metrics]),
-        "f1_score": np.mean([m[1]["f1_score"] for m in per_image_metrics]),
-        "true_positives": sum(m[1]["true_positives"] for m in per_image_metrics),
-        "false_positives": sum(m[1]["false_positives"] for m in per_image_metrics),
-        "false_negatives": sum(m[1]["false_negatives"] for m in per_image_metrics),
-    }
+    # Calculate metrics
+    metrics = evaluate_precision(ground_truth, predictions, iou_threshold)
 
-    return avg_metrics, overall_metrics, per_image_metrics
+    # Add object count
+    metrics["object_count"] = object_count
+
+    # Generate metrics text
+    metrics_text = (
+        f"Image: {os.path.basename(image_path)}\n"
+        f"Object Count: {object_count}\n"
+        f"Ground Truth Boxes: {metrics['gt_count']}\n"
+        f"Predicted Boxes: {metrics['pred_count']}\n"
+        f"Precision: {metrics['precision']:.4f}\n"
+        f"Recall: {metrics['recall']:.4f}\n"
+        f"F1: {metrics['f1_score']:.4f}\n"
+    )
+
+    # Save metrics to text file if path provided
+    if output_txt_path:
+        with open(output_txt_path, "w") as f:
+            f.write(metrics_text)
+
+    # Set up figure for visualization
+    if output_img_path:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+
+        # Display images
+        ax1.imshow(gt_image)
+        ax1.axis("off")
+
+        ax2.imshow(pred_image)
+        ax2.axis("off")
+
+        # Add metrics text to figure
+        # plt.figtext(
+        #     0.5,
+        #     0.01,
+        #     metrics_text,
+        #     ha="center",
+        #     fontsize=14,
+        #     bbox={"facecolor": "white", "alpha": 0.8, "pad": 5},
+        # )
+
+        plt.tight_layout(rect=[0, 0.08, 1, 1])  # Adjust layout for text
+        plt.savefig(output_img_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)  # Close the figure to free memory
+
+    # Print metrics to console for monitoring progress
+    # print(
+    #     f"Processed {os.path.basename(image_path)}: Obj={object_count}, P={metrics['precision']:.4f}, R={metrics['recall']:.4f}, F1={metrics['f1_score']:.4f}"
+    # )
+
+    return metrics
+
+
+def batch_process_dataset(
+    model, img_dir, label_dir, output_dir, confidence_threshold=0.5, iou_threshold=0.5
+):
+    """
+    Process all images in the dataset and save visualizations and metrics
+
+    Args:
+        model: Loaded YOLO model
+        img_dir (str): Directory containing images
+        label_dir (str): Directory containing labels
+        output_dir (str): Directory to save outputs
+        confidence_threshold (float): Confidence threshold for predictions
+        iou_threshold (float): IoU threshold for evaluation
+    """
+    # Create output directories
+    vis_dir = os.path.join(output_dir, "visualizations")
+    metrics_dir = os.path.join(output_dir, "metrics")
+    os.makedirs(vis_dir, exist_ok=True)
+    os.makedirs(metrics_dir, exist_ok=True)
+
+    # Get all image files
+    image_files = (
+        glob.glob(os.path.join(img_dir, "*.jpg"))
+        + glob.glob(os.path.join(img_dir, "*.jpeg"))
+        + glob.glob(os.path.join(img_dir, "*.png"))
+    )
+
+    # Summary statistics
+    all_metrics = []
+    total_images = len(image_files)
+    processed_images = 0
+    total_objects = 0
+
+    print(f"Found {total_images} images to process")
+
+    # Process each image
+    for image_path in image_files:
+        # Get corresponding label path
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        label_path = os.path.join(label_dir, base_name + ".txt")
+
+        # Skip if label doesn't exist
+        if not os.path.exists(label_path):
+            print(f"WARNING: No label found for {base_name}, skipping")
+            continue
+
+        # Define output paths
+        vis_path = os.path.join(vis_dir, f"{base_name}_vis.png")
+        metrics_path = os.path.join(metrics_dir, f"{base_name}_metrics.txt")
+
+        # Process image and save outputs
+        metrics = process_and_save_visualization(
+            model,
+            image_path,
+            label_path,
+            confidence_threshold,
+            iou_threshold,
+            vis_path,
+            metrics_path,
+        )
+
+        # Store metrics for summary
+        metrics["image"] = base_name
+        all_metrics.append(metrics)
+
+        # Update totals
+        total_objects += metrics["object_count"]
+
+        # Update progress
+        processed_images += 1
+        # print(f"Progress: {processed_images}/{total_images} images processed")
+
+    # Calculate and save overall metrics
+    if all_metrics:
+        avg_precision = sum(m["precision"] for m in all_metrics) / len(all_metrics)
+        avg_recall = sum(m["recall"] for m in all_metrics) / len(all_metrics)
+        avg_f1 = sum(m["f1_score"] for m in all_metrics) / len(all_metrics)
+        total_tp = sum(m["true_positives"] for m in all_metrics)
+        total_fp = sum(m["false_positives"] for m in all_metrics)
+        total_fn = sum(m["false_negatives"] for m in all_metrics)
+        total_gt = sum(m["gt_count"] for m in all_metrics)
+        total_pred = sum(m["pred_count"] for m in all_metrics)
+
+        summary_text = (
+            f"=== EVALUATION SUMMARY ===\n"
+            f"Total images processed: {len(all_metrics)}\n"
+            f"Total objects in labels: {total_objects}\n"
+            f"Total ground truth boxes: {total_gt}\n"
+            f"Total predicted boxes: {total_pred}\n"
+            f"Average Precision: {avg_precision:.4f}\n"
+            f"Average Recall: {avg_recall:.4f}\n"
+            f"Average F1 Score: {avg_f1:.4f}\n"
+            f"Total TP: {total_tp}, Total FP: {total_fp}, Total FN: {total_fn}\n"
+            f"Confidence_threshold: {confidence_threshold}\n"
+            f"==========================="
+        )
+
+        summary_path = os.path.join(output_dir, "evaluation_summary.txt")
+        with open(summary_path, "w") as f:
+            f.write(summary_text)
+
+        print(summary_text)
+
+    # print(f"Processing complete. Results saved to {output_dir}")
 
 
 def main():
     # Configuration
-    MODEL_PATH = "colab/runs_28_03_2025_structured/detect/train2/weights/best.pt"
-    IMAGES_DIR = "datasets/test/images"
-    LABELS_DIR = "datasets/test/labels"
-    CONFIDENCE_THRESHOLD = 0.5
-    IOU_THRESHOLD = 0.5
+    MODEL_PATH = "colab/runs_30_03_2025_structured/detect/train2/weights/best.pt"
+    IMG_DIR = "datasets/test/images"
+    LABEL_DIR = "datasets/test/labels"
+    CONFIDENCE_THRESHOLD = 0.15
+    IOU_THRESHOLD = 0.1
+    OUTPUT_DIR = "output_evaluations"
 
     try:
-        # Load the model once
+        # Load the model
+        print(f"Loading model from {MODEL_PATH}...")
         model = YOLO(MODEL_PATH)
 
-        # Get all image files
-        image_files = [
-            f for f in os.listdir(IMAGES_DIR) if f.endswith((".jpg", ".png", ".jpeg"))
-        ]
-        if not image_files:
-            print("No images found in the specified directory.")
-            return
-
-        # Calculate average metrics at the beginning
-        print("Calculating average metrics across all test images...")
-        avg_metrics, overall_metrics, per_image_metrics = calculate_average_metrics(
-            model, IMAGES_DIR, LABELS_DIR, CONFIDENCE_THRESHOLD, IOU_THRESHOLD
+        # Batch process all images
+        print(f"Starting batch processing of images in {IMG_DIR}")
+        batch_process_dataset(
+            model, IMG_DIR, LABEL_DIR, OUTPUT_DIR, CONFIDENCE_THRESHOLD, IOU_THRESHOLD
         )
 
-        # Display average metrics
-        print("\nAverage Metrics Across All Images:")
-        for metric, value in avg_metrics.items():
-            if metric in ["true_positives", "false_positives", "false_negatives"]:
-                print(f"{metric.replace('_', ' ').title()}: {int(value)}")
-            else:
-                print(f"{metric.replace('_', ' ').title()}: {value:.4f}")
-
-        print("\nOverall Metrics (Calculated on all detections at once):")
-        for metric, value in overall_metrics.items():
-            if metric in ["true_positives", "false_positives", "false_negatives"]:
-                print(f"{metric.replace('_', ' ').title()}: {int(value)}")
-            else:
-                print(f"{metric.replace('_', ' ').title()}: {value:.4f}")
-
-        # Create a class for handling image navigation
-        class ImageNavigator:
-            def __init__(
-                self,
-                model,
-                image_files,
-                images_dir,
-                labels_dir,
-                confidence_threshold=0.5,
-                iou_threshold=0.5,
-            ):
-                self.model = model
-                self.image_files = image_files
-                self.images_dir = images_dir
-                self.labels_dir = labels_dir
-                self.confidence_threshold = confidence_threshold
-                self.iou_threshold = iou_threshold
-                self.current_index = 0
-
-                # Create output directory for visualizations
-                self.output_dir = "output_visualizations"
-                os.makedirs(self.output_dir, exist_ok=True)
-
-                # Create the figure
-                self.fig = plt.figure(figsize=(16, 10))
-
-                # Set up the layout
-                self.ax1 = plt.subplot2grid((5, 2), (0, 0), rowspan=4)
-                self.ax2 = plt.subplot2grid((5, 2), (0, 1), rowspan=4)
-                self.ax_info = plt.subplot2grid((5, 2), (4, 0), colspan=2)
-
-                # Disable axis for info area
-                self.ax_info.axis("off")
-
-                # Add buttons
-                self.ax_prev = plt.axes([0.3, 0.05, 0.1, 0.075])
-                self.ax_next = plt.axes([0.6, 0.05, 0.1, 0.075])
-                self.ax_save = plt.axes([0.75, 0.05, 0.1, 0.075])
-
-                self.btn_prev = Button(self.ax_prev, "Previous")
-                self.btn_next = Button(self.ax_next, "Next")
-                self.btn_save = Button(self.ax_save, "Save")
-
-                self.btn_prev.on_clicked(self.on_prev)
-                self.btn_next.on_clicked(self.on_next)
-                self.btn_save.on_clicked(self.on_save)
-
-                # Initialize with the first image
-                self.update_display()
-
-                # Set window title
-                plt.suptitle("Object Detection Evaluation", fontsize=16)
-
-            def update_display(self):
-                # Clear axes
-                self.ax1.clear()
-                self.ax2.clear()
-
-                # Get current image
-                img_file = self.image_files[self.current_index]
-                image_path = os.path.join(self.images_dir, img_file)
-                label_path = os.path.join(
-                    self.labels_dir, os.path.splitext(img_file)[0] + ".txt"
-                )
-
-                # Process the image
-                _, ground_truth, predictions, gt_image, pred_image = (
-                    process_single_image(
-                        self.model, image_path, label_path, self.confidence_threshold
-                    )
-                )
-
-                # Calculate metrics
-                metrics = evaluate_precision(
-                    [ground_truth], [predictions], self.iou_threshold
-                )
-
-                # Display images
-                self.ax1.imshow(gt_image)
-                self.ax1.set_title("Ground Truth")
-                self.ax1.axis("off")
-
-                self.ax2.imshow(pred_image)
-                self.ax2.set_title("Model Predictions")
-                self.ax2.axis("off")
-
-                # Display metrics and image info
-                metrics_text = f"Image: {img_file} ({self.current_index+1}/{len(self.image_files)})\n"
-                metrics_text += f"Precision: {metrics['precision']:.4f}, "
-                metrics_text += f"Recall: {metrics['recall']:.4f}, "
-                metrics_text += f"F1 Score: {metrics['f1_score']:.4f}\n"
-                metrics_text += f"True Positives: {metrics['true_positives']}, "
-                metrics_text += f"False Positives: {metrics['false_positives']}, "
-                metrics_text += f"False Negatives: {metrics['false_negatives']}"
-
-                # Display metrics info
-                self.ax_info.clear()
-                self.ax_info.text(
-                    0.5,
-                    0.5,
-                    metrics_text,
-                    ha="center",
-                    va="center",
-                    fontsize=12,
-                    bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8),
-                )
-                self.ax_info.axis("off")
-
-                plt.draw()
-
-            def on_prev(self, event):
-                self.current_index = (self.current_index - 1) % len(self.image_files)
-                self.update_display()
-
-            def on_next(self, event):
-                self.current_index = (self.current_index + 1) % len(self.image_files)
-                self.update_display()
-
-            def on_save(self, event):
-                img_file = self.image_files[self.current_index]
-                output_path = os.path.join(
-                    self.output_dir,
-                    f"visualization_{os.path.splitext(img_file)[0]}.png",
-                )
-
-                # Save current figure
-                plt.savefig(output_path, dpi=300, bbox_inches="tight")
-                print(f"Visualization saved to {output_path}")
-
-        # Create navigator and show
-        navigator = ImageNavigator(
-            model,
-            image_files,
-            IMAGES_DIR,
-            LABELS_DIR,
-            CONFIDENCE_THRESHOLD,
-            IOU_THRESHOLD,
-        )
-
-        plt.tight_layout()
-        plt.show()
-
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
         import traceback
 
         traceback.print_exc()

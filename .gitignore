@@ -18,3 +18,7 @@ colab/runs
 yolo11x.pt
 yolo11n.pt
 mean_average_precision
+cut_img
+cut_img 2
+*.xlsx
+*.pptx
